@@ -1,0 +1,6 @@
+CommonBehavior.Endpoints=tcp -p 11000
+DifferentialRobotProxy = differentialrobot:tcp -h localhost -p 10022
+LaserProxy = laser:tcp -h localhost -p 10023
+Ice.Warn.Connections=0
+Ice.Trace.Network=0
+Ice.Trace.Protocol=0
