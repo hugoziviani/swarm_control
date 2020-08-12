@@ -116,8 +116,6 @@ if __name__ == '__main__':
 
     # Remote object connection for DifferentialRobot
     try:
-        robot_id = ic.getProperties().getProperty('RobotId')
-        
         proxyString = ic.getProperties().getProperty('DifferentialRobotProxy')
         try:
             basePrx = ic.stringToProxy(proxyString)
@@ -131,7 +129,6 @@ if __name__ == '__main__':
         print(e)
         print('Cannot get DifferentialRobotProxy property.')
         status = 1
-
 
     # Remote object connection for Laser
     try:
@@ -151,8 +148,6 @@ if __name__ == '__main__':
 
     if status == 0:
         worker = SpecificWorker(mprx, args.startup_check)
-        worker.set_robot_id(robot_id)
-        worker.clean_outputs()
         worker.setParams(parameters)
     else:
         print("Error getting required connections, check config file")

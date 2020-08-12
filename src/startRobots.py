@@ -2,22 +2,23 @@ import os
 import threading
 import time
 import subprocess
+import random
+
+
 
 process = list()
-for p in range(0,16):
+for p in range(0, 1):
     process.append(subprocess.Popen(args=[ "python3", "src/MyFirstComp.py", "etc/config"+str(p)]))
+    time.sleep(random.uniform(0,1))
 
-time.sleep(120)
+time.sleep(99999)
 
 for p in process:
     p.kill()
+
 # threading._start_new_thread(os.system('python3 src/MyFirstComp.py etc/config0'),"(process0)",)
 # threading._start_new_thread(os.system('python3 src/MyFirstComp.py etc/config1'),"(process1)",)
 # threading._start_new_thread(os.system('python3 src/MyFirstComp.py etc/config2'),"(process2)",)
-
-
-
-
 
 
 # a = np.array([3,5,2,5,3,4,3,4,1,5,5,5,3,3,2,3,3,2])
