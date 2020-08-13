@@ -39,6 +39,7 @@ class SpecificWorker(GenericWorker):
         self.T1_got_signal = 0
         self.T2_befor_acting = 0
         self.T3_after_execution = 0
+        self.walk_distance = 0
 
         self.last_x = 0
         self.last_z = 0
@@ -57,7 +58,6 @@ class SpecificWorker(GenericWorker):
     def clean_outputs(self):
         if os.path.exists(self.newfile+str(self.robot_id)):
             os.remove(self.newfile+str(self.robot_id))
-
 
     def setParams(self, params):
         #try:
@@ -87,12 +87,39 @@ class SpecificWorker(GenericWorker):
         return state
 
     def __distance(self, p0, p1):
-        return math.sqrt((p0[0] - p1[0])**2 + (p0[1] - p1[1])**2)
+        x1, z1 = float(p0[0]), float(p0[1])
+        x2, z2 = float(p1[0]), float(p1[1])
+        return math.sqrt((x2 - x1)**2 + (z2 - z1)**2)
 
     def __vel_robot(self, displacement):
         delta_time = self.T0_befor_signal - self.T3_after_execution
         return (displacement/delta_time)
 
+    def __angle_to_destiny(self, p0, p1):
+        (x1, z1) = float(p0[0]), float(p0[1])
+        (x2, z2) = float(p1[0]), float(p1[1])
+        try:
+            return math.acos((z2-z1)/self.__distance((x1, z1), (x2, z2)))
+        except Exception as e:
+            print("ERROR: ",e)
+            return 0
+    def __angle_to_destiny2(self, p0, p1):
+        (x1, z1) = float(p0[0]), float(p0[1])
+        (x2, z2) = float(p1[0]), float(p1[1])
+        # norma:
+        x1 = 10 if (x1 and z1) == 0 else  x1
+        z1 = 10 if (x1 and z1) == 0 else  z1
+        x2 = 10 if (x1 and z1) == 0 else  x2
+        z2 = 10 if (x1 and z1) == 0 else  z2
+        #n1 = 1 if math.sqrt(x1**2 + z1**2) == 0 else math.sqrt(x1**2 + z1**2)
+        n1 = math.sqrt(x1**2 + z1**2)
+        #n2 = 1 if math.sqrt(x2**2 + z2**2) == 0 else math.sqrt(x2**2 + z2**2)
+        n2 = math.sqrt(x2**2 + z2**2)
+        # produto interno:
+        pI = x1*x2 + z1*z2
+        ang = (pI/n1*n2)
+        
+        return math.cos(ang)
 
     @QtCore.Slot()
     # T0 - antes de adquirir o dado do sensor
@@ -102,64 +129,63 @@ class SpecificWorker(GenericWorker):
     def compute(self):
         self.T0_befor_signal = time.perf_counter()
         
-        rot = 0.5
         #rot = random.uniform(-1,1)
         #print(rot)
         try:
             x, z, alpha = self.differentialrobot_proxy.getBasePose()
-            print("ATUAL:",x,z)
             base_state_raw = self.differentialrobot_proxy.getBaseState()
             base_state = self.__get_separete_values(base_state_raw)
             
-            ldata = []
-            d = []
-            ldata = self.laser_proxy.getLaserData()
-
-            for i in range(0,len(ldata)):
-                dis = ldata[i]
-                y = dis.dist
-                d.append(y)
-            d.sort()
-            distance = d[0]
             displacement = self.__distance([self.last_x, self.last_z],[base_state.get("x"), base_state.get("z")])
             inst_vel = self.__vel_robot(displacement)
             delta_time = self.T0_befor_signal - self.T3_after_execution
             
-            #  Vx = v cos(ângulo)
-            #  Vy = v sen(angulo)
             ang = alpha
             Vx = inst_vel * math.cos(ang)
             Vz = inst_vel * math.sin(ang)
 
             X = x + Vx * delta_time
             Z = z + Vz * delta_time
-
-            # def walk_dist(dist):
-            # sum = 0
-            # while sum < dist:
-            #     sum += velocidade_instantanea*delta_t
-            #     time.sleep(delta_t)
-            # robot.stop()
-
-
-            # total = 0
-            # while total < displaced:
-            #     total += velocidade_instantanea*delta_t
-            #     time.sleep(delta_t)
-            # robot.stop()
-
-            print("PROXIMO:",int(X), int(Z))
-
             
+            #print("Base Pose:", self.differentialrobot_proxy.getBasePose())
+            #print("Base State:", self.differentialrobot_proxy.getBaseState())
+            #print("stop",self.differentialrobot_proxy.stopBase())
+            destiny = (100, 100)
+            origin = (x, z)
+            turn = self.__angle_to_destiny(origin, destiny)
+            tork = math.sqrt(destiny[0]**2 + destiny[1]**2)
+            distance = self.__distance(origin, destiny)
+            timeTo = distance * inst_vel
+            print("vel. inst.: ", inst_vel)
+            print("Distance: ", distance)
+            print("Turn: ", turn)
+            print("Tork: ", tork)
+            print("Time: ", timeTo)
+            ang = self.__angle_to_destiny2(origin, destiny)
+            print("ANG: ",ang)
+            if ang > 0.001:
+                self.differentialrobot_proxy.setSpeedBase(0, 0.1)
+            else:
+                self.differentialrobot_proxy.setSpeedBase(0, 0)
+
+            ldata = []
+            d = []
+            ldata = self.laser_proxy.getLaserData()
+            for i in range(0,len(ldata)):
+                dis = ldata[i]
+                y = dis.dist
+                d.append(y)
+            d.sort()
+            limiar = d[0]
+            # if limiar < 500:
+            #     # virar para o primeiro lado maior que 400 de distancia
+            #     self.differentialrobot_proxy.setSpeedBase(0, 0.5)
+            #     time.sleep(0.001)
+            # else:
+            #     self.differentialrobot_proxy.setSpeedBase(100, 0)
+            #     #time.sleep(0.3)
 
             self.T2_befor_acting = time.perf_counter()
-        
-            if distance < 600:
-                self.differentialrobot_proxy.setSpeedBase(0, rot)
-            else:
-                self.differentialrobot_proxy.setSpeedBase(300, 0)
-
-            
             self.last_x = base_state.get("x")
             self.last_z = base_state.get("z")
 
@@ -213,4 +239,5 @@ class SpecificWorker(GenericWorker):
     # From the RoboCompLaser you can use this types:
     # RoboCompLaser.LaserConfData
     # RoboCompLaser.TData
+
 
