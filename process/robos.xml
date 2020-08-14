@@ -9,7 +9,7 @@
             <plane id="ddF2" nz="1" pz="2500" py="200" px="0" size="5000,500,13" texture="#555555" />
             <plane id="ddB2" nz="1" pz="-2500" py="200" px="0" size="5000,500,13" texture="#555555" />
         </transform>
-        <transform id="robot0" tx="0">
+        <transform id="robot0" tx="0" tz="0">
             <differentialrobot id="base0" port="10004">
                 <mesh id="base_robex0" file="/home/robocomp/robocomp/files/osgModels/robex/robex.ive" tx="0" ty="0" tz="0" scale="500" collide="1" />
                 <translation id="laserPose0" tx="0" ty="140" tz="0">

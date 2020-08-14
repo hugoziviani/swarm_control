@@ -1,0 +1,6 @@
+RobotId = 1
+DifferentialRobotProxy = differentialrobot:tcp -h 192.168.0.6 -p 10006
+LaserProxy = laser:tcp -h 192.168.0.6 -p 10007
+Ice.Warn.Connections=0
+Ice.Trace.Network=0
+Ice.Trace.Protocol=0

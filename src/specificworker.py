@@ -46,10 +46,14 @@ class SpecificWorker(GenericWorker):
         self.T2_befor_acting = 0
         self.T3_after_execution = 0
         self.walk_distance = 0
-        self.destiny = [0, 1000]
-
+        self.destiny = [-100, -100]
+        
+        self.last_angle_measure = 0
+        self.last_distance_measure = 0
+        self.last_turn = 0
         self.last_x = 0
         self.last_z = 0
+
 
         self.newfile = "/home/hz/robocomp/components/autonomous/log_outputs/"
         self.first_exec = True
@@ -158,13 +162,13 @@ class SpecificWorker(GenericWorker):
             base_state = self.__get_separete_values(base_state_raw)
 
             if not self.first_exec:
-                self.robot_vector[0], self.robot_vector[1] = self.robot_vector[0] + x, self.robot_vector[1] + z
-                
+                # talvez aqui somar a distancia da origem até o x atual
+                #self.robot_vector[0], self.robot_vector[1] = self.robot_vector[0] + x, self.robot_vector[1] + z
+                print("[",x," ",z,"]")
                 
                 displacement = self.__distance([self.last_x, self.last_z],[base_state.get("x"), base_state.get("z")])
                 
                 delta_time = self.T0_befor_signal - self.T3_after_execution
-                displaced = base_state.get("z")
                 
                 inst_vel = self.__vel_robot(displacement)
                 
@@ -174,33 +178,63 @@ class SpecificWorker(GenericWorker):
                 X = x + Vx * delta_time
                 Z = z + Vz * delta_time
                 distance = self.__distance([X,Z], self.destiny)
-
+                
                 # print("andado: ", displaced)
-                print("distancia: ", distance)
+                #print("distancia: ", distance)
+                ang = self.__angle_between(self.robot_vector, self.destiny)
+                ang = ang * 180/math.pi
+                vector_result = (0.0,0.0)
+                turn = 0.2
+
+                # distance tá diminuindo
+                decreasing = True
                 
-                
-                
-                
-                
-                if distance > 20: # 100 de limite
+                if distance > 20 and ang > 20 and decreasing: # 100 de limite
                     # ver angulo
-                    ang = self.__angle_between(self.robot_vector, self.destiny)* 180/math.pi
-                    #print("ang: ",ang)
-                    if ang > 90.0: # tem que andar pra trás, ou dar o giro até ficar de frente pro angulo
-                        self.differentialrobot_proxy.setSpeedBase(0, 0.2)
-                        angle_result = self.__rotate_vector(self.robot_vector, alpha, False)
-                        self.robot_vector = angle_result
-                        #print("Anle_result ", angle_result)
-                    elif distance > 100:
-                        #print("ajeitou!!!!")
-                        #print(self.robot_vector)
-                        self.differentialrobot_proxy.setSpeedBase(70, 0)
-                    if distance < 100:
-                        self.differentialrobot_proxy.setSpeedBase(0, 0)
-                else:
+                    print("ang: ", ang)
+                    if ang > 15: # tem que andar pra trás, ou dar o giro até ficar de frente pro angulo
+                        if self.destiny[0] < self.robot_vector[0] and self.destiny[1] < self.robot_vector[1]:
+                            # virar pra esquerda e calcula o deslocamento do vetor_robo p esquerda
+                            #print("<,<")
+                            self.differentialrobot_proxy.setSpeedBase(0, -turn)
+                            vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = True)
+                        
+                        if self.destiny[0] > self.robot_vector[0] and self.destiny[1] > self.robot_vector[1]:
+                            # virar pra direita e calcula o deslocamnto do vetor_robo p direita
+                            #print(">,>")
+                            self.differentialrobot_proxy.setSpeedBase(0, turn)
+                            vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = False)
+                        
+                        if self.destiny[0] < self.robot_vector[0] and self.destiny[1] > self.robot_vector[1]:
+                            # virar pra esquerda e calcula o deslocamento do vetor_robo p esquerda
+                            #print("<,>")
+                            self.differentialrobot_proxy.setSpeedBase(0, -turn)
+                            vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = True)
+                        
+                        if self.destiny[0] > self.robot_vector[0] and self.destiny[1] < self.robot_vector[1]:
+                            # virar pra direita e calcula o deslocamnto do vetor_robo p direita
+                            #print(">,<")
+                            self.differentialrobot_proxy.setSpeedBase(0, turn)
+                            vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = False)
+
+                    
+                elif distance > 20 and decreasing:
+                    self.differentialrobot_proxy.setSpeedBase(70, 0)
+                
+                elif not decreasing:
                     self.differentialrobot_proxy.setSpeedBase(0, 0)
                 
-                
+                decreasing = True if distance < self.last_distance_measure else False
+                self.robot_vector = vector_result
+                    
+                    #    print("parou")
+
+                    # if self.robot_vector[0] < reference_to_move_base[0]:
+                    #     self.differentialrobot_proxy.setSpeedBase(0, 0)
+                    #     print("robot_vector", self.robot_vector[0], "Ref:" ,reference_to_move_base[0])
+                    
+                        #self.differentialrobot_proxy.setSpeedBase(70, 0)
+                    
                 #print("ALPHA:",alpha)
                 #self.robot_vector = [x + self.robot_vector[0], z + self.robot_vector[1]]
                 #print(x, z, alpha)
