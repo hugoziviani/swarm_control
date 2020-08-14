@@ -1,1 +1,21 @@
-<innerModel><transform id="world"><transform id="floor"><plane id="ddG" ny="1" px="-0" py="0" pz="0" size="5000,5000,10" texture="/home/robocomp/robocomp/files/osgModels/textures/wood.jpg" /><plane id="ddR" nx="1" px="2500" py="200" pz="0" size="5000,500,10" texture="#eeeeee" /><plane id="ddL" nx="1" px="-2500" py="200" pz="0" size="5000,500,10" texture="#eeeeee" /><plane id="ddR2" nx="1" px="2500" py="200" pz="0" size="5000,500,13" texture="#eeeeee" /><plane id="ddL2" nx="1" px="-2500" py="200" pz="0" size="5000,500,13" texture="#eeeeee" /><plane id="ddF2" nz="1" pz="2500" py="200" px="0" size="5000,500,13" texture="#555555" /><plane id="ddB2" nz="1" pz="-2500" py="200" px="0" size="5000,500,13" texture="#555555" /></transform><transform id="robot0" tx="0"><differentialrobot id="base0" port="10004"><mesh id="base_robex0" file="/home/robocomp/robocomp/files/osgModels/robex/robex.ive" tx="0" ty="0" tz="0" scale="600" collide="1" /><translation id="laserPose0" tx="0" ty="140" tz="0"><laser id="laser0" port="10005" measures="50" min="50" max="5000" angle="1" ifconfig="1000" /></translation></differentialrobot></transform></transform></innerModel>
+<innerModel>
+    <transform id="world">
+        <transform id="floor">
+            <plane id="ddG" ny="1" px="-0" py="0" pz="0" size="5000,5000,10" texture="/home/robocomp/robocomp/files/osgModels/textures/wood.jpg" />
+            <plane id="ddR" nx="1" px="2500" py="200" pz="0" size="5000,500,10" texture="#eeeeee" />
+            <plane id="ddL" nx="1" px="-2500" py="200" pz="0" size="5000,500,10" texture="#eeeeee" />
+            <plane id="ddR2" nx="1" px="2500" py="200" pz="0" size="5000,500,13" texture="#eeeeee" />
+            <plane id="ddL2" nx="1" px="-2500" py="200" pz="0" size="5000,500,13" texture="#eeeeee" />
+            <plane id="ddF2" nz="1" pz="2500" py="200" px="0" size="5000,500,13" texture="#555555" />
+            <plane id="ddB2" nz="1" pz="-2500" py="200" px="0" size="5000,500,13" texture="#555555" />
+        </transform>
+        <transform id="robot0" tx="0">
+            <differentialrobot id="base0" port="10004">
+                <mesh id="base_robex0" file="/home/robocomp/robocomp/files/osgModels/robex/robex.ive" tx="0" ty="0" tz="0" scale="500" collide="1" />
+                <translation id="laserPose0" tx="0" ty="140" tz="0">
+                    <laser id="laser0" port="10005" measures="50" min="50" max="5000" angle="0.5" ifconfig="1000" />
+                </translation>
+            </differentialrobot>
+        </transform>
+    </transform>
+</innerModel>
