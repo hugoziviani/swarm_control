@@ -25,9 +25,11 @@ from genericworker import *
 import time, traceback, random, os, math
 from scipy.spatial.transform import Rotation as R
 import numpy as np
+import sys
+import matplotlib.pyplot as plt
 
 # If RoboComp was compiled with Python bindings you can use InnerModel in Python
-# sys.path.append('/opt/robocomp/lib')
+#sys.path.append('./opt/robocomp/lib')
 # import librobocomp_qmat
 # import librobocomp_osgviewer
 # import librobocomp_innermodel
@@ -35,9 +37,9 @@ import numpy as np
 class SpecificWorker(GenericWorker):
     def __init__(self, proxy_map, startup_check=False):
         super(SpecificWorker, self).__init__(proxy_map)
-        x,y,z = 3000.0, 0, 3000.0
-        self.origin = [x,y,z]
-        self.robot_vector = [0,10]
+        #robot
+        self.robot_vector = [0,0]
+        self.unity_vector = [0,1]
         self.robot_angle = 0.0
         self.robot_id = int()
         self.Period = 2000
@@ -45,15 +47,19 @@ class SpecificWorker(GenericWorker):
         self.T1_got_signal = 0
         self.T2_befor_acting = 0
         self.T3_after_execution = 0
+        
         self.walk_distance = 0
-        self.destiny = [-100, -100]
+        self.front_robot_angle = 0.0
+        
+        #destiny
+        self.angle_destiny = 0.0
+        self.destiny = [800, 800]
         
         self.last_angle_measure = 0
         self.last_distance_measure = 0
         self.last_turn = 0
         self.last_x = 0
         self.last_z = 0
-
 
         self.newfile = "/home/hz/robocomp/components/autonomous/log_outputs/"
         self.first_exec = True
@@ -64,8 +70,8 @@ class SpecificWorker(GenericWorker):
             self.timer.start(self.Period)
 
     def __del__(self):
-        
         print('SpecificWorker destructor')
+
     def clean_outputs(self):
         if os.path.exists(self.newfile+str(self.robot_id)):
             os.remove(self.newfile+str(self.robot_id))
@@ -102,6 +108,10 @@ class SpecificWorker(GenericWorker):
         x2, z2 = float(p1[0]), float(p1[1])
         return math.sqrt((x2 - x1)**2 + (z2 - z1)**2)
 
+    def __to_target(self):
+        vector_distancy = math.sqrt(self.robot_vector[0]**2 + self.robot_vector[1]**2) + math.sqrt(self.destiny[0]**2+self.destiny[1]**2)
+        return round(vector_distancy, 2)
+
     def __vel_robot(self, displacement):
         delta_time = self.T0_befor_signal - self.T3_after_execution
         return (displacement/delta_time)
@@ -118,9 +128,8 @@ class SpecificWorker(GenericWorker):
     def __angle_between(self, p0, p1):
         (x1, z1) = float(p0[0]), float(p0[1])
         (x2, z2) = float(p1[0]), float(p1[1])
-        normaA = math.sqrt(x1**2 + z1**2)
-        normaB = math.sqrt(x2**2 + z2**2)
-        if normaA * normaB == 0:
+        a = (x1*x2 + z1*z2)
+        if a == 0:
             return 0
             # vai pra frente conforme a distancia do objetivo
         else:
@@ -151,81 +160,154 @@ class SpecificWorker(GenericWorker):
     # T1 - depois de adquirir o dado do sensor e antes de enviar.
     # T2 - Antes de começar a atuar a partir da resposta, depois de enviar e receber a resposta,
     # T3 - depois de atuar
+    
     def compute(self):
         self.T0_befor_signal = time.perf_counter()
-        
-        #rot = random.uniform(-1,1)
-        #print(rot)
         try:
             x, z, alpha = self.differentialrobot_proxy.getBasePose()
             base_state_raw = self.differentialrobot_proxy.getBaseState()
             base_state = self.__get_separete_values(base_state_raw)
+            self.robot_vector = [self.robot_vector[0] + float(x), self.robot_vector[1] + float(z)]
 
             if not self.first_exec:
-                # talvez aqui somar a distancia da origem até o x atual
-                #self.robot_vector[0], self.robot_vector[1] = self.robot_vector[0] + x, self.robot_vector[1] + z
-                print("[",x," ",z,"]")
+                self.angle_destiny = round(self.__angle_between(self.unity_vector, self.destiny) * 180/math.pi, 2)
+                self.front_robot_angle = round(alpha * 180/math.pi % 360.0, 2)
                 
-                displacement = self.__distance([self.last_x, self.last_z],[base_state.get("x"), base_state.get("z")])
-                
-                delta_time = self.T0_befor_signal - self.T3_after_execution
-                
-                inst_vel = self.__vel_robot(displacement)
-                
-                Vx = inst_vel * math.cos(alpha)
-                Vz = inst_vel * math.sin(alpha)
-                
-                X = x + Vx * delta_time
-                Z = z + Vz * delta_time
-                distance = self.__distance([X,Z], self.destiny)
-                
-                # print("andado: ", displaced)
-                #print("distancia: ", distance)
-                ang = self.__angle_between(self.robot_vector, self.destiny)
-                ang = ang * 180/math.pi
-                vector_result = (0.0,0.0)
-                turn = 0.2
+                self.last_turn = self.last_turn - self.front_robot_angle
+                print("Angulo para o destino:", self.angle_destiny)
+                print("ANGULO ROBO:", self.front_robot_angle)
 
-                # distance tá diminuindo
-                decreasing = True
+                ldata = []
+                d = []
+                ldata = self.laser_proxy.getLaserData()
+                for i in range(0,len(ldata)):
+                    dis = ldata[i]
+                    y = dis.dist
+                    d.append(y)
+                d.sort()
+                limiar = d[0]
+
+                turn = 0.05
+                distance = round(self.__distance([x, z], self.destiny), 2)
+                self.angle_destiny = self.__angle_between(self.unity_vector, self.destiny)
                 
-                if distance > 20 and ang > 20 and decreasing: # 100 de limite
-                    # ver angulo
-                    print("ang: ", ang)
-                    if ang > 15: # tem que andar pra trás, ou dar o giro até ficar de frente pro angulo
-                        if self.destiny[0] < self.robot_vector[0] and self.destiny[1] < self.robot_vector[1]:
-                            # virar pra esquerda e calcula o deslocamento do vetor_robo p esquerda
-                            #print("<,<")
-                            self.differentialrobot_proxy.setSpeedBase(0, -turn)
-                            vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = True)
-                        
-                        if self.destiny[0] > self.robot_vector[0] and self.destiny[1] > self.robot_vector[1]:
-                            # virar pra direita e calcula o deslocamnto do vetor_robo p direita
-                            #print(">,>")
-                            self.differentialrobot_proxy.setSpeedBase(0, turn)
-                            vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = False)
-                        
-                        if self.destiny[0] < self.robot_vector[0] and self.destiny[1] > self.robot_vector[1]:
-                            # virar pra esquerda e calcula o deslocamento do vetor_robo p esquerda
-                            #print("<,>")
-                            self.differentialrobot_proxy.setSpeedBase(0, -turn)
-                            vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = True)
-                        
-                        if self.destiny[0] > self.robot_vector[0] and self.destiny[1] < self.robot_vector[1]:
-                            # virar pra direita e calcula o deslocamnto do vetor_robo p direita
-                            #print(">,<")
-                            self.differentialrobot_proxy.setSpeedBase(0, turn)
-                            vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = False)
+                if distance < 200:
+                    self.differentialrobot_proxy.setSpeedBase(0, 0)
+                    print("Tá perto, Distance:", distance)
+
+                
+                if abs(self.angle_destiny - self.robot_angle) > 30 and limiar > 300:
+                    self.differentialrobot_proxy.setSpeedBase(0, turn)
+                    #inverse = True if self.last_turn < 0 else False
+                    vector_result = self.__rotate_vector(self.unity_vector, abs(self.last_turn), False)
+                    self.unity_vector = vector_result
+                
+                    
+                else:
+                    self.differentialrobot_proxy.setSpeedBase(100, 0)
+                    
+                    print("OBJETIVO: ", self.destiny)
+                    print("Minha Posicao: ", self.robot_vector)
 
                     
-                elif distance > 20 and decreasing:
-                    self.differentialrobot_proxy.setSpeedBase(70, 0)
+
+                    
+                # self.differentialrobot_proxy.setSpeedBase(0, -turn)
+
+                ldata = []
+                d = []
+                ldata = self.laser_proxy.getLaserData()
+                for i in range(0,len(ldata)):
+                    dis = ldata[i]
+                    y = dis.dist
+                    d.append(y)
+                d.sort()
+                limiar = d[0]
+                if limiar < 500:
+                    # virar para o primeiro lado maior que 400 de distancia
+                    self.differentialrobot_proxy.setSpeedBase(0, turn)
+                    time.sleep(0.1)
+                else:
+                    self.differentialrobot_proxy.setSpeedBase(100, 0)
+                    time.sleep(0.1)
+
+                # displacement = self.__distance([self.last_x, self.last_z],[base_state.get("x"), base_state.get("z")])
                 
-                elif not decreasing:
-                    self.differentialrobot_proxy.setSpeedBase(0, 0)
+                # delta_time = self.T0_befor_signal - self.T3_after_execution
                 
-                decreasing = True if distance < self.last_distance_measure else False
-                self.robot_vector = vector_result
+                # inst_vel = self.__vel_robot(displacement)
+                
+                # Vx = inst_vel * math.cos(alpha)
+                # Vz = inst_vel * math.sin(alpha)
+                
+                # X = x + Vx * delta_time
+                # Z = z + Vz * delta_time
+                # distance = round(self.__distance([x,z], self.destiny), 2)
+
+# C = B + k*u
+# k vai ser o quanto o robo já andou x ou z
+# u é o vetor unitário
+# C é o destino
+# B posição atual
+
+# OBS: se eu souber quantos graus/segundo, sei a vel angular.
+# pra poder virar o robo, dou o comando durante alguns segundos.
+
+                # #if ang < 30.0:
+                # if True:
+                #     # se for virar pra direita, calcular o deslocamento de angulo
+                #     # calcular o angulo do destino a partir do zero
+                #     self.differentialrobot_proxy.setSpeedBase(0, turn)
+                # else:
+                #     self.differentialrobot_proxy.setSpeedBase(0, -turn)
+                    # # ver angulo
+                    # # print("ang: ", ang, "vetor", round(self.unity_vector[0],2), round(self.unity_vector[1],2))
+                    # print("Alpha: ", alpha * 180/math.pi)
+                    # # 2Pi*r = 360
+                    # self.differentialrobot_proxy.setSpeedBase(0, turn)
+                    # v = self.__rotate_vector(self.unity_vector, alpha - self.last_turn, inverse = False)
+                    # self.unity_vector = v
+                    
+
+                    #if ang > 15: # tem que andar pra trás, ou dar o giro até ficar de frente pro angulo
+                        # if self.destiny[0] < self.robot_vector[0] and self.destiny[1] < self.robot_vector[1]:
+                        #     # virar pra esquerda e calcula o deslocamento do vetor_robo p esquerda
+                        #     #print("<,<")
+                        #     self.differentialrobot_proxy.setSpeedBase(0, -turn)
+                        #     vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = True)
+                        #     time.sleep(0.1)
+                        
+                        # elif self.destiny[0] > self.robot_vector[0] and self.destiny[1] > self.robot_vector[1]:
+                        #     # virar pra direita e calcula o deslocamnto do vetor_robo p direita
+                        #     #print(">,>")
+                        #     self.differentialrobot_proxy.setSpeedBase(0, turn)
+                        #     vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = False)
+                        #     time.sleep(0.1)
+                        
+                        # elif self.destiny[0] < self.robot_vector[0] and self.destiny[1] > self.robot_vector[1]:
+                        #     # virar pra esquerda e calcula o deslocamento do vetor_robo p esquerda
+                        #     #print("<,>")
+                        #     self.differentialrobot_proxy.setSpeedBase(0, -turn)
+                        #     vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = True)
+                        #     time.sleep(0.1)
+
+                        # elif self.destiny[0] > self.robot_vector[0] and self.destiny[1] < self.robot_vector[1]:
+                        #     # virar pra direita e calcula o deslocamnto do vetor_robo p direita
+                        #     #print(">,<")
+                        #     self.differentialrobot_proxy.setSpeedBase(0, turn)
+                        #     vector_result = self.__rotate_vector(self.robot_vector, alpha - self.last_turn, inverse = False)
+                        #     time.sleep(0.1)
+
+                    
+                # elif distance > 200 and 20 < ang < 40:
+                #     self.differentialrobot_proxy.setSpeedBase(70, 0)
+                
+                # else:
+                #     self.differentialrobot_proxy.setSpeedBase(0, 0)
+                
+                # self.decreasing = True if distance <= self.last_distance_measure else False
+                # self.last_distance_measure = distance
+                # self.robot_vector = vector_result
                     
                     #    print("parou")
 
@@ -299,26 +381,11 @@ class SpecificWorker(GenericWorker):
                 
                 #self.differentialrobot_proxy.setSpeedBase(0.1, 0)
 
-                # ldata = []
-                # d = []
-                # ldata = self.laser_proxy.getLaserData()
-                # for i in range(0,len(ldata)):
-                #     dis = ldata[i]
-                #     y = dis.dist
-                #     d.append(y)
-                # d.sort()
-                # limiar = d[0]
-                # if limiar < 500:
-                #     # virar para o primeiro lado maior que 400 de distancia
-                #     self.differentialrobot_proxy.setSpeedBase(0, 0.5)
-                #     time.sleep(0.001)
-                # else:
-                #     self.differentialrobot_proxy.setSpeedBase(100, 0)
-                #     #time.sleep(0.3)
+                
 
                 self.T2_befor_acting = time.perf_counter()
-                # self.last_x = base_state.get("x")
-                # self.last_z = base_state.get("z")
+            #     # self.last_x = base_state.get("x")
+            #     # self.last_z = base_state.get("z")
             else:
                 self.differentialrobot_proxy.getBaseState()
                 self.first_exec = False
